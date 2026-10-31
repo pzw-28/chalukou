@@ -95,6 +95,127 @@
       return { positions, meta:{ fileName, fileHash, version, sheets, total:positions.length, headers:[...EXPECTED_HEADERS] } };
     }
 
+    const STATUS = { PASS:"符合", FAIL:"不符", PENDING:"待确认" };
+
+    function check(key, label, status, expected, actual, reason) {
+      return { key, label, status, expected:String(expected ?? ""), actual:String(actual ?? ""), reason };
+    }
+
+    function matchEducation(required, actual) {
+      const rank = { "大专":1, "本科":2, "硕士研究生":3, "博士研究生":4 };
+      if (!(actual in rank)) return null;
+      if (required.startsWith("仅限")) return actual === required.slice(2);
+      if (required === "本科或硕士研究生") return ["本科","硕士研究生"].includes(actual);
+      if (required === "大专或本科") return ["大专","本科"].includes(actual);
+      if (required.endsWith("及以上")) return rank[actual] >= rank[required.slice(0,-3)];
+      return null;
+    }
+
+    function matchDegree(required, actual, education) {
+      if (required === "无要求") return true;
+      if (!actual || actual === "不确定") return null;
+      const corresponding = { "大专":"无", "本科":"学士", "硕士研究生":"硕士", "博士研究生":"博士" };
+      const expected = required === "与最高学历相对应的学位" ? corresponding[education] : required;
+      if (!expected) return null;
+      return actual === expected;
+    }
+
+    function matchPolitical(required, actual) {
+      if (required === "不限") return true;
+      if (required === "中共党员") return actual === "中共党员";
+      if (required === "中共党员或共青团员") return ["中共党员","共青团员"].includes(actual);
+      return null;
+    }
+
+    function matchGrassroots(required, actual) {
+      if (required === "无限制") return true;
+      const years = { "无经验":0, "一年":1, "二年":2, "三年":3, "五年以上":5 };
+      if (!(actual in years) || !(required in years)) return null;
+      return years[actual] >= years[required];
+    }
+
+    function majorStage(text, education) {
+      const stage = ["硕士研究生","博士研究生"].includes(education) ? "研究生" : "本科";
+      if (!/本科：|研究生：/.test(text)) return { stage, segment:text };
+      const match = text.match(new RegExp(`${stage}：([\\s\\S]*?)(?=\\s*(?:本科|研究生)：|$)`));
+      return { stage, segment:match ? match[1].trim() : "" };
+    }
+
+    function normalizeMajorItem(item) {
+      return item.replace(/^\d+[A-Z]?/i, "").replace(/[（(][0-9A-Z]+[）)]/gi, "").replace(/专业$/, "").trim();
+    }
+
+    function matchMajor(required, actual, education) {
+      const text = required.replace(/\s+/g, " ").trim();
+      if (["不限","专业不限"].includes(text)) return true;
+      if (!actual.trim()) return null;
+      const { segment } = majorStage(text, education);
+      if (!segment) return null;
+      if (/[（(][^）)]*[、，][^）)]*[）)]/.test(segment)) return null;
+      const items = segment.split(/[、，,；;。\n]+/).map(item => item.trim()).filter(Boolean);
+      const target = actual.trim();
+      for (const item of items) {
+        const withoutCode = item.replace(/[（(][0-9A-Z]+[）)]/gi, "");
+        if (/[（）()]|类|相关|方向|限|不含|除外|等|或/.test(withoutCode)) continue;
+        if (normalizeMajorItem(item) === target) return true;
+      }
+      return null;
+    }
+
+    function isContactOnly(remark) {
+      const residual = remark
+        .replace(/[\d０-９\s\-—－–—_：:，,。.、;；（）()]/g, "")
+        .replace(/咨询电话|联系电话|电话|无/g, "");
+      return residual.trim() === "";
+    }
+
+    function evaluatePosition(position, profile) {
+      const raw = position.raw;
+      const checks = [];
+      const major = matchMajor(raw["专业"], profile.major, profile.education);
+      checks.push(check("major","专业",major === true ? STATUS.PASS : STATUS.PENDING,`${raw["专业"]}（按${profile.education}阶段）`,profile.major,major === true ? "专业项明确匹配" : "专业大类、方向、跨阶段或其他歧义需咨询招录机关"));
+
+      const education = matchEducation(raw["学历"], profile.education);
+      checks.push(check("education","学历",education === true ? STATUS.PASS : education === false ? STATUS.FAIL : STATUS.PENDING,raw["学历"],profile.education,education === false ? "学历不满足原表条件" : education === null ? "学历条件无法确定" : "学历条件匹配"));
+
+      const degree = matchDegree(raw["学位"], profile.degree, profile.education);
+      checks.push(check("degree","学位",degree === true ? STATUS.PASS : degree === false ? STATUS.FAIL : STATUS.PENDING,raw["学位"],profile.degree,degree === false ? "学位与学历要求不对应" : degree === null ? "学位信息不足" : "学位条件匹配"));
+
+      const political = matchPolitical(raw["政治面貌"], profile.political);
+      checks.push(check("political","政治面貌",political === true ? STATUS.PASS : political === false ? STATUS.FAIL : STATUS.PENDING,raw["政治面貌"],profile.political,political === false ? "政治面貌不满足" : political === null ? "政治面貌无法确定" : "政治面貌匹配"));
+
+      const remark = raw["备注"].trim();
+      let remarkStatus = STATUS.PENDING;
+      let remarkReason = "备注含未完全核验的限制，必须查看原文";
+      if (!remark || isContactOnly(remark)) {
+        remarkStatus = STATUS.PASS;
+        remarkReason = remark ? "备注仅为联系信息" : "原表备注为空";
+      } else if (/限\s*2027\s*届|2027\s*年应届/.test(remark) && profile.graduate === "非2027届") {
+        remarkStatus = STATUS.FAIL;
+        remarkReason = "原表明确限定2027届，当前届别不符";
+      } else if (/限\s*应届|限\s*2027\s*届|2027\s*年应届/.test(remark)) {
+        remarkReason = "应届身份、届别或备注其他限制未完全核实";
+      }
+      checks.push(check("remark","应届与备注",remarkStatus,remark || "空",profile.graduate,remarkReason));
+
+      const grassroots = matchGrassroots(raw["基层工作最低年限"], profile.grassroots);
+      checks.push(check("grassroots","基层年限",grassroots === true ? STATUS.PASS : grassroots === false ? STATUS.FAIL : STATUS.PENDING,raw["基层工作最低年限"],profile.grassroots,grassroots === false ? "基层工作年限不足" : grassroots === null ? "基层年限信息不足" : "基层年限匹配"));
+
+      const servicePass = raw["服务基层项目工作经历"] === "无限制";
+      checks.push(check("service","服务基层身份",servicePass ? STATUS.PASS : STATUS.PENDING,raw["服务基层项目工作经历"],"本次未采集",servicePass ? "原表无限制" : "服务基层身份未核实，不得判符合"));
+
+      const locations = Array.isArray(profile.locations) ? profile.locations : [];
+      const location = raw["工作地点"];
+      const locationMatched = locations.some(item => location === item || location.startsWith(item));
+      const locationStatus = !locations.length ? STATUS.PENDING : locationMatched ? STATUS.PASS : STATUS.FAIL;
+      checks.push(check("location","工作地点",locationStatus,location,locations.join("、") || "未选择",!locations.length ? "尚未选择可接受地点" : locationMatched ? "工作地点可接受" : "工作地点不在可接受范围"));
+
+      const status = checks.some(item => item.status === STATUS.FAIL) ? STATUS.FAIL : checks.some(item => item.status === STATUS.PENDING) ? STATUS.PENDING : STATUS.PASS;
+      return { status, checks };
+    }
+
+    window.ChalukouRules = { STATUS, evaluatePosition, matchEducation, matchDegree, matchPolitical, matchGrassroots, matchMajor };
+
     function renderImportSummary() {
       const { meta } = state;
       document.getElementById("importSummary").innerHTML = `
