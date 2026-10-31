@@ -1,0 +1,17 @@
+#!/bin/sh
+# commit-msg：每次功能提交必须对应一份 AI 对话记录
+# 提交信息带编号，如：feat: 合同条款识别 [P-003]
+# 并且 prompt-log/P-003.md 已经 git add
+first=$(head -n1 "$1")
+case "$first" in
+  Merge*|Revert*|docs:*|chore:*) exit 0 ;;
+esac
+id=$(printf '%s\n' "$first" | grep -oE 'P-[0-9]{3}' | head -n1)
+if [ -z "$id" ]; then
+  echo "✗ 提交信息缺少对话编号，例：feat: 合同条款识别 [P-003]"
+  exit 1
+fi
+if ! git cat-file -e ":prompt-log/$id.md" 2>/dev/null; then
+  echo "✗ prompt-log/$id.md 还没 git add，先把这轮对话存进去"
+  exit 1
+fi
