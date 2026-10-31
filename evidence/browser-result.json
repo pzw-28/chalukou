@@ -1,0 +1,26 @@
+{
+  "counts": {
+    "符合": 1,
+    "不符": 19413,
+    "待确认": 12
+  },
+  "detail": {
+    "open": true,
+    "title": "民盟中央｜办公室一级主任科员及以下",
+    "rows": 27
+  },
+  "delta": {
+    "before": 0,
+    "after": 1,
+    "change": 1,
+    "added": [
+      {
+        "source_file": "中央机关及其直属机构2027年度考试录用公务员招考简章.xls",
+        "sheet": "中央党群机关",
+        "excel_row": 58,
+        "sha256": "6b3da70baabe31a4a202c6b1179040db7003a956bc85c79cd35e3fb739d9520a"
+      }
+    ]
+  },
+  "reimportCleared": true
+}
