@@ -38,6 +38,8 @@
     .location-box label { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:8px; padding:5px 7px; font-weight:400; border-radius:6px; }
     .location-box label:hover { background:#f0f4fa; }
     .location-box input { width:auto; }
+    .clear-locations { border:1px solid #cbd6e5; border-radius:9px; padding:9px 12px; background:white; color:var(--blue); cursor:pointer; font:inherit; }
+    .clear-locations:hover { background:#edf3ff; }
     .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
     .stat { border:1px solid var(--line); border-radius:13px; padding:17px; background:white; text-align:left; cursor:pointer; }
     .stat strong { display:block; font-size:31px; line-height:1.1; }
@@ -114,6 +116,7 @@
           <label>基层工作年限<select id="grassroots"><option>无经验</option><option>一年</option><option selected>二年</option><option>三年</option><option>五年以上</option><option>不确定</option></select></label>
           <label>搜索并多选工作地点<input id="locationSearch" placeholder="输入省、市或区县筛选" autocomplete="off"></label>
           <div id="locationOptions" class="location-box"></div>
+          <button id="clearLocations" type="button" class="clear-locations">清空已选地点</button>
         </div>
       </aside>
       <div class="card">
@@ -453,6 +456,12 @@
     document.getElementById("locationSearch").addEventListener("input", buildLocationOptions);
     document.getElementById("locationOptions").addEventListener("change", () => {
       state.profile.locations = [...document.getElementById("locationOptions").querySelectorAll("input:checked")].map(input => input.value);
+      recalculate({ locationChange:true });
+    });
+    document.getElementById("clearLocations").addEventListener("click", () => {
+      state.profile.locations = [];
+      document.getElementById("locationSearch").value = "";
+      buildLocationOptions();
       recalculate({ locationChange:true });
     });
     document.getElementById("stats").addEventListener("click", event => {
