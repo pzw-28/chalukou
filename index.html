@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>岔路口｜可核验的国考选择沙盘</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    :root { color-scheme: light; --ink:#17243b; --muted:#65738b; --line:#dfe6ef; --paper:#f4f7fb; --card:#fff; --blue:#2457d6; --green:#11845b; --red:#cf3f4f; --amber:#a86500; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:"Segoe UI","Microsoft YaHei",sans-serif; background:var(--paper); color:var(--ink); }
+    header { padding:28px 4vw 22px; background:#14243f; color:white; }
+    header h1 { margin:0 0 8px; font-size:30px; letter-spacing:1px; }
+    header p { margin:0; color:#dce7ff; font-size:16px; }
+    main { max-width:1500px; margin:0 auto; padding:24px 3vw 40px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px; box-shadow:0 8px 28px #2031540a; }
+    .import-grid { display:grid; grid-template-columns:minmax(300px,.8fr) minmax(400px,1.4fr); gap:20px; }
+    h2 { margin:0 0 14px; font-size:20px; }
+    h3 { margin:0 0 10px; font-size:16px; }
+    .muted { color:var(--muted); line-height:1.65; }
+    .file-label { display:block; border:2px dashed #9bb2dc; border-radius:12px; padding:24px; text-align:center; color:var(--blue); font-weight:650; cursor:pointer; background:#f7faff; }
+    .file-label:hover { background:#edf3ff; }
+    input[type=file] { margin-top:16px; width:100%; }
+    .status { margin-top:14px; min-height:24px; line-height:1.55; }
+    .error { color:var(--red); white-space:pre-wrap; }
+    .success { color:var(--green); }
+    .metric { display:inline-block; margin:0 10px 10px 0; padding:12px 16px; border-radius:12px; background:#eef3ff; }
+    .metric strong { display:block; font-size:25px; color:var(--blue); }
+    .sheet-list { display:grid; gap:8px; margin-top:12px; }
+    .sheet-row { display:flex; justify-content:space-between; gap:16px; padding:10px 12px; border-radius:9px; background:#f7f9fc; }
+    code { word-break:break-all; }
+    .hidden { display:none; }
+    @media (max-width:850px) { .import-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>岔路口</h1>
+    <p>所有数字由程序从官方职位表算出，可点开查看原表行号</p>
+  </header>
+  <main>
+    <section class="import-grid">
+      <div class="card">
+        <h2>导入 2027 国考职位表</h2>
+        <p class="muted">选择国家公务员局发布的原始 Excel。文件只在当前浏览器中解析，不会上传到服务器。</p>
+        <label class="file-label" for="excelFile">选择官方 .xls 文件</label>
+        <input id="excelFile" type="file" accept=".xls,.xlsx">
+        <div id="importStatus" class="status muted">尚未导入文件</div>
+      </div>
+      <div class="card">
+        <h2>原表结构核验</h2>
+        <div id="importSummary" class="muted">导入后显示真实 sheet、表头和职位记录数。</div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const EXPECTED_HEADERS = ["部门代码","部门名称","用人司局","机构性质","招考职位","职位属性","职位分布","职位简介","职位代码","机构层级","考试类别","招考人数","专业","学历","学位","政治面貌","基层工作最低年限","服务基层项目工作经历","是否在面试阶段组织专业能力测试","面试人员比例","工作地点","落户地点","备注","部门网站","咨询电话1","咨询电话2","咨询电话3"];
+    const state = { positions:[], meta:null };
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);
+    }
+
+    function parseWorkbook(arrayBuffer, fileName, fileHash) {
+      if (typeof XLSX === "undefined") throw new Error("SheetJS 未加载，请联网后刷新页面");
+      const workbook = XLSX.read(arrayBuffer, { type:"array" });
+      const positions = [];
+      const sheets = [];
+      const version = `sha256:${fileHash}`;
+      for (const sheetName of workbook.SheetNames) {
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header:1, raw:false, defval:"" });
+        const hasContent = rows.some(row => row.some(value => String(value ?? "").trim()));
+        if (!hasContent) continue;
+        if (rows.length < 2) throw new Error(`${sheetName} 缺少第 2 行表头`);
+        const headers = rows[1].map(value => String(value ?? "").trim());
+        const missing = EXPECTED_HEADERS.filter((header, index) => headers[index] !== header);
+        if (missing.length || headers.length !== EXPECTED_HEADERS.length) {
+          throw new Error(`${sheetName} 表头与官方 27 列不一致，已停止筛选`);
+        }
+        let count = 0;
+        for (let index = 2; index < rows.length; index += 1) {
+          const values = rows[index];
+          if (!values.some(value => String(value ?? "").trim())) continue;
+          const raw = Object.fromEntries(headers.map((header, column) => [header, String(values[column] ?? "")]));
+          positions.push({
+            id:`${version}::${sheetName}::${index + 1}`,
+            raw,
+            trace:{ source_file:fileName, sheet:sheetName, excel_row:index + 1, sha256:fileHash }
+          });
+          count += 1;
+        }
+        sheets.push({ name:sheetName, count, firstRow:3, lastRow:rows.length });
+      }
+      if (!positions.length) throw new Error("没有找到可解析的职位记录");
+      return { positions, meta:{ fileName, fileHash, version, sheets, total:positions.length, headers:[...EXPECTED_HEADERS] } };
+    }
+
+    function renderImportSummary() {
+      const { meta } = state;
+      document.getElementById("importSummary").innerHTML = `
+        <div class="metric"><strong>${meta.total}</strong><span>条真实职位记录</span></div>
+        <div class="metric"><strong>${meta.sheets.length}</strong><span>个数据 sheet</span></div>
+        <p class="muted">表头：第 2 行｜首条职位：第 3 行｜空白 sheet 已跳过</p>
+        <div class="sheet-list">${meta.sheets.map(sheet => `<div class="sheet-row"><span>${escapeHtml(sheet.name)}</span><strong>${sheet.count} 条</strong></div>`).join("")}</div>
+        <p class="muted">文件 SHA256<br><code>${escapeHtml(meta.fileHash)}</code></p>`;
+    }
+
+    async function handleFile(file) {
+      const status = document.getElementById("importStatus");
+      try {
+        status.className = "status muted";
+        status.textContent = "正在计算文件哈希并读取原表…";
+        const buffer = await file.arrayBuffer();
+        if (!crypto.subtle) throw new Error("当前浏览器无法计算 SHA256，请使用新版 Edge 或 Chrome");
+        const digest = await crypto.subtle.digest("SHA-256", buffer);
+        const fileHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2,"0")).join("");
+        const parsed = parseWorkbook(buffer, file.name, fileHash);
+        state.positions = parsed.positions;
+        state.meta = parsed.meta;
+        renderImportSummary();
+        status.className = "status success";
+        status.textContent = `已读取 ${file.name}`;
+      } catch (error) {
+        state.positions = [];
+        state.meta = null;
+        document.getElementById("importSummary").textContent = "导入失败，未生成任何筛选数字。";
+        status.className = "status error";
+        status.textContent = error.message;
+      }
+    }
+
+    document.getElementById("excelFile").addEventListener("change", event => {
+      if (event.target.files[0]) handleFile(event.target.files[0]);
+    });
+
+    window.Chalukou = { parseWorkbook, state, EXPECTED_HEADERS };
+  </script>
+</body>
+</html>
