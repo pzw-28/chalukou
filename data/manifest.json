@@ -1,0 +1,23 @@
+{
+  "data_version": "gk2027-20261010",
+  "year": 2027,
+  "title": "中央机关及其直属机构2027年度考试录用公务员招考简章",
+  "source_url": "http://bm.scs.gov.cn/pp/gkweb/core/web/ui/business/download/gkdownloads.html",
+  "source_site": "中央机关及其直属机构2027年度考试录用公务员专题网站",
+  "file_name": "中央机关及其直属机构2027年度考试录用公务员招考简章.xls",
+  "file_size": 9654272,
+  "sha256": "6b3da70baabe31a4a202c6b1179040db7003a956bc85c79cd35e3fb739d9520a",
+  "cell_content_sha256_sheetjs": "4aa9b4b9713c66aac2ceca583ad4a41b6f5b53defcc6835e15afb8d0dba5f3d9",
+  "workbook_modified_time_reported": "2026-10-10T08:38:06Z",
+  "header_row": 2,
+  "first_position_row": 3,
+  "sheets": [
+    { "name": "中央党群机关", "positions": 99, "first_row": 3, "last_row": 101 },
+    { "name": "中央国家行政机关（本级）", "positions": 312, "first_row": 3, "last_row": 314 },
+    { "name": "中央国家行政机关省级以下直属机构", "positions": 18193, "first_row": 3, "last_row": 18195 },
+    { "name": "中央国家行政机关参照公务员法管理事业单位", "positions": 822, "first_row": 3, "last_row": 824 },
+    { "name": "Sheet1", "positions": 0, "empty": true }
+  ],
+  "total_positions": 19426,
+  "note": "用户另行上传的同大小 XLS 二进制 SHA256 不同，但 SheetJS 逐单元格内容哈希一致；本清单对应当前 data/raw 保留文件。"
+}

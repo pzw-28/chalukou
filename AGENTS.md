@@ -6,13 +6,13 @@
 - 名称：岔路口——可核验的考研、就业、考公选择沙盘
 - 一句话：输入自己的条件，看清考公能报哪些职位、考研差多少分、就业是什么去向；改一个条件，机会怎么变。每个数字都能点回原始数据的那一行
 - 核心原则：**数字由程序算，AI 只讲解**
-- 当前版本：v0.1 预指导版（国考筛选 + 逐数溯源 + AI 讲解员）
+- 当前版本：v0.1 预指导版（国考筛选 + 逐数溯源 + 地点差分）
 
 ## 技术约束
-- Next.js（App Router）+ TypeScript；数据读本地 JSON，不用需要编译的数据库驱动
-- 数据预处理用 Python（pandas、openpyxl），产物 JSON 提交进仓库；评委运行网页不需要 Python
-- 只用一个大模型 API Key（DeepSeek，OpenAI 兼容接口），放 .env，绝不写进代码或提交
-- Windows 上 npm install 后一条 npm run dev 能跑
+- 预指导版使用单个 `index.html`、原生 JavaScript 和 SheetJS CDN，Windows 双击即可打开；官方 Excel 由用户本地选择，不上传服务器
+- 正式版再迁移 Next.js（App Router）+ TypeScript；届时数据读本地 JSON，不用需要编译的数据库驱动
+- 预指导版不做 Python 预处理，不要求 npm install；原表 sheet、表头、Excel 行号和 SHA256 必须保留
+- 加分 B 已因进度取消；后续若接入 DeepSeek，只用 OpenAI 兼容接口，Key 在页面临时输入且只存内存，绝不写进代码或提交
 - 要装新依赖，先说理由，等我同意
 
 ## 指令：我说这些词时，按对应流程走

@@ -2,10 +2,11 @@
 
 执行规则：一次只做一条；每条完成后实际验证、更新对应 Prompt 记录并单独提交，然后停下。任何任务不得为赶时间降低三态门槛。
 
-- [ ] T01（约 10 分钟）对齐预指导技术约束与数据档案
+- [x] T01（约 10 分钟）对齐预指导技术约束与数据档案
   - 文件：`AGENTS.md`、`specs/现状.md`、`data/manifest.json`
   - 动作：写明预指导版为单 `index.html`＋SheetJS CDN，DeepSeek Key 若进入后续变更只存内存；正式版再迁移 Next.js。记录官方 URL、文件名、年份、SHA256、sheet 行数及空白 sheet。
   - 验证：文件中的技术约束、数据版本与实际官方 `.xls` 一致，无密钥或虚构字段。
+  - 实测：Python 解析 manifest、重算文件 SHA256 和 sheet 合计均通过；`git diff --check` 通过。
   - 提交：`docs: 明确预指导版技术约束与数据版本 [P-002]`
 
 - [ ] T02（约 25 分钟）实现浏览器 Excel 导入和行级来源模型
