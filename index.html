@@ -58,6 +58,27 @@
     .list-tools { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:12px 0; }
     .list-tools button { border:1px solid var(--line); background:white; border-radius:8px; padding:7px 12px; cursor:pointer; }
     .list-tools button:disabled { opacity:.4; cursor:default; }
+    .delta { border-radius:12px; padding:14px 16px; margin-bottom:16px; background:#eef3ff; }
+    .delta.positive { background:#e5f6ee; color:#086444; }
+    .delta.negative { background:#ffedef; color:#a12d3a; }
+    .delta-number { display:inline-block; font-size:34px; font-weight:800; margin-right:12px; }
+    .delta-list { display:grid; gap:7px; max-height:240px; overflow:auto; margin-top:12px; }
+    dialog { width:min(1050px,92vw); max-height:88vh; border:0; border-radius:16px; padding:0; color:var(--ink); }
+    dialog::backdrop { background:#0c1729aa; }
+    .dialog-head { display:flex; justify-content:space-between; gap:16px; align-items:start; padding:20px 24px; background:#14243f; color:white; }
+    .dialog-head h2 { margin:0; }
+    .dialog-head button { border:1px solid #ffffff66; border-radius:8px; background:transparent; color:white; padding:7px 12px; cursor:pointer; }
+    .dialog-body { padding:22px 24px; overflow:auto; }
+    .trace-box { padding:13px 15px; border-radius:10px; background:#edf3ff; line-height:1.75; margin-bottom:16px; }
+    .condition { border-left:5px solid; border-radius:8px; padding:11px 13px; margin:8px 0; }
+    .condition.pass { border-color:var(--green); background:#eef9f4; }
+    .condition.fail { border-color:var(--red); background:#fff0f1; }
+    .condition.pending { border-color:var(--amber); background:#fff7e7; }
+    .condition strong { display:block; margin-bottom:4px; }
+    .condition p { margin:4px 0; line-height:1.55; }
+    .raw-table { width:100%; border-collapse:collapse; table-layout:fixed; }
+    .raw-table th, .raw-table td { border:1px solid var(--line); padding:8px 10px; vertical-align:top; text-align:left; word-break:break-word; }
+    .raw-table th { width:180px; background:#f5f7fa; }
     @media (max-width:1000px) { .workspace { grid-template-columns:1fr; } }
     @media (max-width:850px) { .import-grid { grid-template-columns:1fr; } }
   </style>
@@ -108,11 +129,15 @@
         </div>
       </div>
     </section>
+    <dialog id="detailDialog">
+      <div class="dialog-head"><h2 id="detailTitle">职位原表依据</h2><button id="closeDetail" type="button">关闭</button></div>
+      <div id="detailBody" class="dialog-body"></div>
+    </dialog>
   </main>
   <script>
     const EXPECTED_HEADERS = ["部门代码","部门名称","用人司局","机构性质","招考职位","职位属性","职位分布","职位简介","职位代码","机构层级","考试类别","招考人数","专业","学历","学位","政治面貌","基层工作最低年限","服务基层项目工作经历","是否在面试阶段组织专业能力测试","面试人员比例","工作地点","落户地点","备注","部门网站","咨询电话1","咨询电话2","咨询电话3"];
     const state = {
-      positions:[], meta:null, evaluated:[], activeStatus:"符合", page:1, pageSize:50, locationCounts:[],
+      positions:[], meta:null, evaluated:[], activeStatus:"符合", page:1, pageSize:50, locationCounts:[], baseline:null, delta:null,
       profile:{ major:"法学", education:"本科", degree:"学士", political:"群众", graduate:"不确定", grassroots:"二年", locations:["北京市东城区"] }
     };
 
@@ -305,11 +330,44 @@
       recalculate();
     }
 
-    function recalculate() {
+    function nonLocationProfileKey() {
+      const { locations, ...rest } = state.profile;
+      return JSON.stringify(rest);
+    }
+
+    function recalculate({ locationChange = false } = {}) {
+      if (!locationChange) {
+        state.baseline = null;
+        state.delta = null;
+      }
+      const previous = state.baseline;
       state.evaluated = state.positions.map(position => ({ position, result:evaluatePosition(position, state.profile) }));
+      const passIds = new Set(state.evaluated.filter(entry => entry.result.status === STATUS.PASS).map(entry => entry.position.id));
+      const key = nonLocationProfileKey();
+      if (locationChange && previous && previous.version === state.meta.version && previous.key === key) {
+        const added = state.evaluated.filter(entry => entry.result.status === STATUS.PASS && !previous.passIds.has(entry.position.id)).map(entry => entry.position);
+        state.delta = { before:previous.passIds.size, after:passIds.size, change:passIds.size - previous.passIds.size, added };
+      } else {
+        state.delta = null;
+      }
+      state.baseline = { version:state.meta.version, key, passIds };
       state.page = 1;
+      renderDelta();
       renderStats();
       renderList();
+    }
+
+    function renderDelta() {
+      const panel = document.getElementById("deltaPanel");
+      if (!state.delta) {
+        panel.className = "muted";
+        panel.textContent = "当前地点组合是比较基线；修改地点后显示变化量和新增职位。";
+        return;
+      }
+      const { before, after, change, added } = state.delta;
+      const sign = change > 0 ? `+${change}` : `${change}`;
+      panel.className = change > 0 ? "delta positive" : change < 0 ? "delta negative" : "delta";
+      panel.innerHTML = `<div class="delta-number">${sign}</div><strong>符合职位 ${before} → ${after}</strong><span>｜新增 ${added.length} 个，仅归因于工作地点变化</span>${added.length ? `<div class="delta-list">${added.map(position => `<button type="button" class="position-row" data-id="${escapeHtml(position.id)}"><strong>${escapeHtml(position.raw["部门名称"])}｜${escapeHtml(position.raw["招考职位"])}</strong><small>${escapeHtml(position.raw["工作地点"])}｜${escapeHtml(position.trace.sheet)} 第 ${position.trace.excel_row} 行</small></button>`).join("")}</div>` : "<p>本次没有新增符合职位。</p>"}`;
     }
 
     function renderStats() {
@@ -340,6 +398,23 @@
       document.getElementById("pageInfo").textContent = `第 ${state.page} / ${pages} 页`;
       document.getElementById("prevPage").disabled = state.page <= 1;
       document.getElementById("nextPage").disabled = state.page >= pages;
+    }
+
+    function renderPositionDetail(id) {
+      const entry = state.evaluated.find(item => item.position.id === id);
+      if (!entry) return;
+      const { position, result } = entry;
+      document.getElementById("detailTitle").textContent = `${position.raw["部门名称"]}｜${position.raw["招考职位"]}`;
+      document.getElementById("detailBody").innerHTML = `
+        <div class="trace-box"><strong>原表位置</strong><br>文件：${escapeHtml(position.trace.source_file)}<br>Sheet：${escapeHtml(position.trace.sheet)}｜Excel 第 <strong>${position.trace.excel_row}</strong> 行<br><small>SHA256：${escapeHtml(position.trace.sha256)}</small></div>
+        <h3>逐项判定（不符标红，待确认标黄）</h3>
+        ${result.checks.map(item => `<div class="condition ${item.status === STATUS.PASS ? "pass" : item.status === STATUS.FAIL ? "fail" : "pending"}"><strong>${escapeHtml(item.label)}｜${item.status}</strong><p>原表：${escapeHtml(item.expected)}</p><p>我的输入：${escapeHtml(item.actual)}</p><p>${escapeHtml(item.reason)}</p></div>`).join("")}
+        <p class="muted">资格结论以招录机关审核为准；待确认项请结合原表备注和咨询电话核实。</p>
+        <h3>原表全部 27 列</h3>
+        <table class="raw-table"><tbody>${Object.entries(position.raw).map(([key,value]) => `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(value || "（空）")}</td></tr>`).join("")}</tbody></table>`;
+      const dialog = document.getElementById("detailDialog");
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
     }
 
     async function handleFile(file) {
@@ -378,7 +453,7 @@
     document.getElementById("locationSearch").addEventListener("input", buildLocationOptions);
     document.getElementById("locationOptions").addEventListener("change", () => {
       state.profile.locations = [...document.getElementById("locationOptions").querySelectorAll("input:checked")].map(input => input.value);
-      recalculate();
+      recalculate({ locationChange:true });
     });
     document.getElementById("stats").addEventListener("click", event => {
       const button = event.target.closest("button[data-status]");
@@ -390,12 +465,21 @@
     });
     document.getElementById("prevPage").addEventListener("click", () => { state.page -= 1; renderList(); });
     document.getElementById("nextPage").addEventListener("click", () => { state.page += 1; renderList(); });
+    document.getElementById("positionList").addEventListener("click", event => {
+      const button = event.target.closest("button[data-id]");
+      if (button) renderPositionDetail(button.dataset.id);
+    });
+    document.getElementById("deltaPanel").addEventListener("click", event => {
+      const button = event.target.closest("button[data-id]");
+      if (button) renderPositionDetail(button.dataset.id);
+    });
+    document.getElementById("closeDetail").addEventListener("click", () => document.getElementById("detailDialog").close());
     document.getElementById("excelFile").addEventListener("change", event => {
       if (event.target.files[0]) handleFile(event.target.files[0]);
     });
 
     window.Chalukou = { parseWorkbook, state, EXPECTED_HEADERS };
-    window.ChalukouUI = { prepareWorkspace, recalculate, renderStats, renderList, buildLocationOptions };
+    window.ChalukouUI = { prepareWorkspace, recalculate, renderStats, renderList, buildLocationOptions, renderPositionDetail };
   </script>
 </body>
 </html>
