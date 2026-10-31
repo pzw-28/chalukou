@@ -4,6 +4,8 @@
 
 公开仓库：https://github.com/pzw-28/chalukou
 
+预指导演示视频（2 分 38 秒，1080p，AI 普通话配音）：https://www.bilibili.com/video/BV1dCxr65E7P/
+
 ## 预指导版能做什么
 
 - 在浏览器本地读取官方 2027 国考招考简章 `.xls`，不上传文件。

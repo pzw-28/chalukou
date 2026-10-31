@@ -1,0 +1,20 @@
+岔路口｜预指导作品链接
+
+公开 GitHub 仓库：
+https://github.com/pzw-28/chalukou
+
+B 站公开演示视频（2 分 38 秒，1080p，AI 普通话配音）：
+https://www.bilibili.com/video/BV1dCxr65E7P/
+
+官方数据来源（2027 国考）：
+http://bm.scs.gov.cn/pp/gkweb/core/web/ui/business/download/gkdownloads.html
+
+打开方式：
+1. 解压 ZIP。
+2. 用新版 Edge 或 Chrome 双击 index.html（首次需联网加载 SheetJS CDN）。
+3. 选择 data/raw/中央机关及其直属机构2027年度考试录用公务员招考简章.xls。
+4. 输入画像，查看三态、原表行号和地点差分。
+
+介绍文档：
+- 岔路口_预指导介绍.pdf（3 页，直接阅读）
+- 岔路口_预指导介绍.docx（可编辑版本）
